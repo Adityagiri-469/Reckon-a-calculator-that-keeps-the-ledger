@@ -22,11 +22,8 @@
 
 ## Live Demo
 
-[Add your GitHub Pages / Netlify link here]
+https://adityagiri-469.github.io/Reckon-a-calculator-that-keeps-the-ledger/
 
-## Screenshots
-
-[Add screenshots here]
 
 ## Future Improvements
 
