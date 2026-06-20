@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Reckon — a calculator that keeps the ledger</title>
+<meta name="description" content="A calculator with variables, math functions, and a running ledger of every figure you've reckoned.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#13161B;
+    --ink-soft:#1B1F26;
+    --ink-raised:#21262F;
+    --ink-line:#2C323C;
+    --brass:#C9A227;
+    --brass-soft:#E6C76B;
+    --teal:#4FA89C;
+    --teal-soft:#7FC4BA;
+    --paper:#F3EEE2;
+    --paper-line:#D9D0BC;
+    --ink-on-paper:#2A2520;
+    --text:#D7DAE1;
+    --text-dim:#8B9099;
+    --text-faint:#5C616B;
+    --danger:#D9684F;
+    --radius:14px;
+    --radius-sm:9px;
+    --display-font:'JetBrains Mono', monospace;
+    --ui-font:'Sora', sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:var(--ink);
+    color:var(--text);
+    font-family:var(--ui-font);
+    -webkit-font-smoothing:antialiased;
+    overflow:hidden;
+  }
+  .app{
+    height:100vh;
+    display:flex;
+    flex-direction:column;
+  }
+
+  /* ---------- top bar ---------- */
+  .topbar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:18px 24px 14px;
+    flex-shrink:0;
+  }
+  .brand{display:flex; align-items:center; gap:12px;}
+  .brand-mark{
+    width:38px; height:38px;
+    border-radius:10px;
+    background:linear-gradient(155deg, var(--brass-soft), var(--brass) 70%);
+    color:#1A1408;
+    display:flex; align-items:center; justify-content:center;
+    font-family:var(--display-font); font-weight:700; font-size:19px;
+    box-shadow:0 2px 0 rgba(0,0,0,.25) inset, 0 6px 14px -4px rgba(201,162,39,.5);
+  }
+  .brand-copy{display:flex; flex-direction:column; line-height:1.15;}
+  .brand-name{
+    font-weight:700; font-size:15px; letter-spacing:.16em;
+    color:var(--text);
+  }
+  .brand-tag{font-size:11.5px; color:var(--text-faint); letter-spacing:.01em;}
+
+  .tape-toggle{
+    display:none;
+    align-items:center; gap:7px;
+    background:var(--ink-raised);
+    border:1px solid var(--ink-line);
+    color:var(--text-dim);
+    font-family:var(--ui-font); font-size:12.5px; font-weight:600;
+    padding:9px 14px;
+    border-radius:999px;
+    cursor:pointer;
+  }
+  .tape-toggle span{
+    background:var(--brass); color:#1A1408;
+    border-radius:999px; min-width:18px; height:18px; padding:0 5px;
+    font-size:11px; display:flex; align-items:center; justify-content:center;
+    font-family:var(--display-font); font-weight:700;
+  }
+
+  /* ---------- stage ---------- */
+  .stage{
+    flex:1;
+    display:grid;
+    grid-template-columns:300px 1fr;
+    gap:18px;
+    padding:0 24px 22px;
+    min-height:0;
+  }
+
+  /* ---------- tape / ledger ---------- */
+  .tape-panel{
+    background:var(--paper);
+    color:var(--ink-on-paper);
+    border-radius:0 0 var(--radius) var(--radius);
+    display:flex;
+    flex-direction:column;
+    min-height:0;
+    position:relative;
+    box-shadow:0 18px 40px -18px rgba(0,0,0,.55);
+    clip-path:polygon(
+      0% 10px, 4% 0px, 8% 10px, 12% 0px, 16% 10px, 20% 0px, 24% 10px, 28% 0px,
+      32% 10px, 36% 0px, 40% 10px, 44% 0px, 48% 10px, 52% 0px, 56% 10px, 60% 0px,
+      64% 10px, 68% 0px, 72% 10px, 76% 0px, 80% 10px, 84% 0px, 88% 10px, 92% 0px,
+      96% 10px, 100% 0px, 100% 100%, 0% 100%
+    );
+  }
+  .tape-head{
+    display:flex; align-items:baseline; justify-content:space-between;
+    padding:26px 18px 10px 20px;
+  }
+  .tape-head h2{
+    margin:0; font-size:12.5px; letter-spacing:.18em; font-weight:700;
+    color:var(--ink-on-paper); opacity:.55; text-transform:uppercase;
+  }
+  .ghost-btn{
+    background:none; border:none; cursor:pointer;
+    font-family:var(--ui-font); font-size:11.5px; font-weight:600;
+    color:#8A6A1E;
+    padding:2px 0;
+    text-decoration:underline dotted;
+    text-decoration-color:rgba(138,106,30,.45);
+  }
+  .ghost-btn:hover{ color:#5b450f; }
+
+  .tape-scroll{
+    flex:1;
+    overflow-y:auto;
+    padding:4px 18px 22px 20px;
+    display:flex;
+    flex-direction:column;
+    gap:0;
+  }
+  .tape-empty{
+    margin:30% 4px 0;
+    font-size:13px;
+    color:#8A8270;
+    line-height:1.6;
+  }
+  .tape-empty kbd{
+    font-family:var(--display-font);
+    background:rgba(0,0,0,.07);
+    padding:1px 6px;
+    border-radius:4px;
+    font-size:11.5px;
+  }
+  .tape-entry{
+    padding:9px 0;
+    border-bottom:1px dashed var(--paper-line);
+    font-family:var(--display-font);
+    cursor:pointer;
+  }
+  .tape-entry:last-child{ border-bottom:none; }
+  .tape-row{
+    display:flex; justify-content:space-between; align-items:baseline; gap:10px;
+  }
+  .tape-idx{
+    font-size:10px; color:#A89F86; min-width:18px;
+  }
+  .tape-expr{
+    font-size:13px; color:#6B6354; flex:1;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .tape-result{
+    font-size:16px; font-weight:600; color:#8A6A1E;
+    white-space:nowrap;
+  }
+  .tape-entry.is-error .tape-result{ color:var(--danger); font-size:13px; font-weight:500; }
+  .tape-entry.is-assign .tape-expr{ color:#3D6B62; }
+
+  /* ---------- pad panel ---------- */
+  .pad-panel{
+    background:var(--ink-soft);
+    border-radius:var(--radius);
+    border:1px solid var(--ink-line);
+    display:flex;
+    flex-direction:column;
+    min-height:0;
+    padding:20px 22px 18px;
+    gap:14px;
+  }
+
+  .display{
+    background:var(--ink);
+    border:1px solid var(--ink-line);
+    border-radius:var(--radius-sm);
+    padding:16px 18px 12px;
+    flex-shrink:0;
+  }
+  .expr-input{
+    width:100%;
+    background:none; border:none; outline:none;
+    font-family:var(--display-font);
+    font-size:25px;
+    font-weight:500;
+    color:var(--text);
+    caret-color:var(--brass);
+  }
+  .expr-input::placeholder{ color:var(--text-faint); font-size:18px; }
+  .preview{
+    min-height:20px;
+    font-family:var(--display-font);
+    font-size:13.5px;
+    color:var(--text-dim);
+    text-align:right;
+    margin-top:4px;
+  }
+  .preview.is-error{ color:var(--danger); }
+  .preview .eq{ color:var(--text-faint); margin-right:5px; }
+  .preview .val{ color:var(--teal-soft); font-weight:600; }
+  .preview .assign-name{ color:var(--brass-soft); font-weight:600; }
+
+  .vars-row{
+    display:flex; gap:8px; flex-wrap:wrap;
+    min-height:30px;
+  }
+  .var-chip{
+    display:flex; align-items:center; gap:8px;
+    background:var(--ink-raised);
+    border:1px solid var(--ink-line);
+    border-radius:999px;
+    padding:6px 6px 6px 12px;
+    font-family:var(--display-font); font-size:12.5px;
+    color:var(--text-dim);
+  }
+  .var-chip b{ color:var(--brass-soft); font-weight:600; margin-right:3px;}
+  .var-chip button{
+    background:var(--ink-line); border:none; color:var(--text-dim);
+    width:18px; height:18px; border-radius:50%; cursor:pointer;
+    font-size:11px; line-height:1; display:flex; align-items:center; justify-content:center;
+  }
+  .var-chip button:hover{ background:var(--danger); color:#fff; }
+  .var-hint{ font-size:12px; color:var(--text-faint); align-self:center; }
+
+  .func-row{
+    display:flex; gap:7px; overflow-x:auto;
+    padding-bottom:2px;
+    flex-shrink:0;
+  }
+  .func-row::-webkit-scrollbar{ height:0; }
+  .fkey{
+    flex-shrink:0;
+    background:var(--ink-raised);
+    border:1px solid var(--ink-line);
+    color:var(--teal-soft);
+    font-family:var(--display-font);
+    font-size:13px; font-weight:500;
+    padding:8px 13px;
+    border-radius:999px;
+    cursor:pointer;
+  }
+  .fkey:hover{ border-color:var(--teal); }
+  .fkey:active{ transform:translateY(1px); }
+  .fkey.var-insert{ color:var(--brass-soft); }
+
+  .keypad{
+    display:grid;
+    grid-template-columns:repeat(4, 1fr);
+    gap:8px;
+    flex:1;
+    min-height:0;
+  }
+  .key{
+    background:var(--ink-raised);
+    border:1px solid var(--ink-line);
+    border-radius:11px;
+    color:var(--text);
+    font-family:var(--display-font);
+    font-size:17px; font-weight:500;
+    cursor:pointer;
+    box-shadow:0 1px 0 rgba(255,255,255,.03) inset;
+    transition:transform .04s ease;
+  }
+  .key:hover{ border-color:#3a414d; }
+  .key:active{ transform:translateY(1px) scale(.98); }
+  .key.op{ color:var(--teal-soft); font-size:18px; }
+  .key.util{ color:var(--text-dim); font-size:13px; font-weight:600; letter-spacing:.02em; }
+  .key.equals{
+    background:linear-gradient(155deg, var(--brass-soft), var(--brass) 75%);
+    color:#1A1408;
+    border:none;
+    font-weight:700;
+    font-size:19px;
+  }
+  .key.equals:hover{ filter:brightness(1.05); }
+  .key.danger{ color:var(--danger); }
+
+  /* ---------- status bar ---------- */
+  .statusbar{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:10px 24px 16px;
+    font-size:12px;
+    color:var(--text-faint);
+    flex-shrink:0;
+  }
+  #status.is-error{ color:var(--danger); }
+  #status.is-ok{ color:var(--teal-soft); }
+
+  /* ---------- help modal ---------- */
+  .modal{
+    position:fixed; inset:0;
+    background:rgba(10,11,13,.6);
+    display:flex; align-items:center; justify-content:center;
+    z-index:50;
+    padding:20px;
+  }
+  .modal[hidden]{ display:none; }
+  .modal-card{
+    background:var(--ink-soft);
+    border:1px solid var(--ink-line);
+    border-radius:var(--radius);
+    max-width:440px; width:100%;
+    max-height:80vh; overflow-y:auto;
+    padding:24px 26px;
+  }
+  .modal-card h3{
+    margin:0 0 14px; font-size:15px; letter-spacing:.05em;
+    color:var(--brass-soft);
+  }
+  .modal-card .grp{ margin-bottom:16px; }
+  .modal-card .grp h4{
+    margin:0 0 6px; font-size:11px; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--text-faint);
+  }
+  .modal-card code{
+    font-family:var(--display-font); font-size:12.5px;
+    background:var(--ink); padding:2px 6px; border-radius:5px;
+    color:var(--teal-soft);
+  }
+  .modal-card p{ font-size:13px; color:var(--text-dim); line-height:1.6; margin:4px 0; }
+  .modal-close{
+    margin-top:6px;
+    background:var(--brass); color:#1A1408; border:none;
+    font-family:var(--ui-font); font-weight:700; font-size:13px;
+    padding:9px 18px; border-radius:999px; cursor:pointer;
+  }
+
+  /* ---------- responsive ---------- */
+  @media (max-width: 760px){
+    .topbar{ padding:16px 16px 12px; }
+    .tape-toggle{ display:flex; }
+    .stage{
+      grid-template-columns:1fr;
+      padding:0 14px 16px;
+    }
+    .tape-panel{
+      position:fixed;
+      top:0; left:0; right:0; bottom:0;
+      z-index:40;
+      border-radius:0;
+      transform:translateY(100%);
+      transition:transform .25s ease;
+      clip-path:none;
+      padding-top:env(safe-area-inset-top);
+    }
+    .tape-panel.open{ transform:translateY(0); }
+    .tape-head{ padding:22px 18px 10px; }
+    .tape-head::after{
+      content:'Close ✕'; position:absolute; top:24px; right:18px;
+      font-size:12px; color:#8A6A1E; cursor:pointer; font-weight:600;
+    }
+    .pad-panel{ padding:16px 14px 14px; gap:12px; }
+    .expr-input{ font-size:21px; }
+    .keypad{ gap:7px; }
+    .key{ font-size:16px; }
+  }
+  @media (max-height: 700px){
+    .keypad{ gap:6px; }
+    .key{ font-size:15px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">∑</div>
+      <div class="brand-copy">
+        <span class="brand-name">RECKON</span>
+        <span class="brand-tag">keeps the ledger of every figure</span>
+      </div>
+    </div>
+    <button id="tapeToggle" class="tape-toggle" aria-expanded="false">Ledger <span id="tapeCount">0</span></button>
+  </header>
+
+  <main class="stage">
+    <aside class="tape-panel" id="tapePanel">
+      <div class="tape-head">
+        <h2>Ledger</h2>
+        <button id="clearVarsBtn" class="ghost-btn">Clear variables</button>
+      </div>
+      <div class="tape-scroll" id="tapeScroll">
+        <p class="tape-empty" id="tapeEmpty">No figures reckoned yet.<br>Type an expression below and press <kbd>Enter</kbd>.</p>
+      </div>
+    </aside>
+
+    <section class="pad-panel">
+      <div class="display">
+        <div class="display-row">
+          <input id="exprInput" class="expr-input" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="2 + 2 · x = 9 · sin(pi/2)" aria-label="Expression input" />
+        </div>
+        <div class="preview" id="preview" aria-live="polite">&nbsp;</div>
+      </div>
+
+      <div class="vars-row" id="varsRow">
+        <span class="var-hint" id="varHint">No variables stored yet — try <code style="font-family:var(--display-font)">x = 9</code></span>
+      </div>
+
+      <div class="func-row" id="funcRow"></div>
+
+      <div class="keypad" id="keypad"></div>
+    </section>
+  </main>
+
+  <footer class="statusbar">
+    <span id="status">Ready</span>
+    <button id="helpBtn" class="ghost-btn">Syntax guide</button>
+  </footer>
+</div>
+
+<div id="helpModal" class="modal" hidden>
+  <div class="modal-card">
+    <h3>Syntax guide</h3>
+    <div class="grp">
+      <h4>Basics</h4>
+      <p><code>2 + 2</code>, <code>(3 + 4) * 2</code>, <code>2 ** 10</code> (power), <code>7 // 2</code> (floor divide), <code>7 % 3</code> (modulo)</p>
+    </div>
+    <div class="grp">
+      <h4>Variables</h4>
+      <p><code>x = 12</code> stores a variable. Use it later: <code>x * 2</code>. Variables persist until you clear them.</p>
+    </div>
+    <div class="grp">
+      <h4>Functions</h4>
+      <p><code>sin cos tan asin acos atan sinh cosh tanh sqrt exp log log2 log10 floor ceil trunc abs degrees radians hypot pow round gcd factorial min max</code></p>
+      <p><code>log(8, 2)</code> takes an optional base. <code>round(3.14159, 2)</code> takes optional decimal places.</p>
+    </div>
+    <div class="grp">
+      <h4>Constants</h4>
+      <p><code>pi</code> · <code>e</code> · <code>tau</code></p>
+    </div>
+    <button class="modal-close" id="helpClose">Got it</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ============ Engine — mirrors calculator.py's safe evaluator ============ */
+  class CalcError extends Error {}
+  const CONSTANTS = { pi: Math.PI, e: Math.E, tau: Math.PI * 2, inf: Infinity, nan: NaN };
+
+  function pyMod(a, b){ if (b === 0) throw new CalcError('division by zero'); return a - Math.floor(a / b) * b; }
+  function pyFloorDiv(a, b){ if (b === 0) throw new CalcError('division by zero'); return Math.floor(a / b); }
+
+  const FUNCS = {
+    sin: Math.sin, cos: Math.cos, tan: Math.tan,
+    asin: Math.asin, acos: Math.acos, atan: Math.atan, atan2: Math.atan2,
+    sinh: Math.sinh, cosh: Math.cosh, tanh: Math.tanh,
+    sqrt: (x) => { if (x < 0) throw new CalcError('sqrt of negative number'); return Math.sqrt(x); },
+    exp: Math.exp,
+    log: (x, base) => { if (x <= 0) throw new CalcError('log domain error'); return base === undefined ? Math.log(x) : Math.log(x) / Math.log(base); },
+    log2: Math.log2, log10: Math.log10,
+    floor: Math.floor, ceil: Math.ceil, trunc: Math.trunc,
+    fabs: Math.abs, abs: Math.abs,
+    degrees: (x) => (x * 180) / Math.PI,
+    radians: (x) => (x * Math.PI) / 180,
+    hypot: Math.hypot,
+    pow: Math.pow,
+    round: (x, n) => { if (n === undefined) return Math.round(x); const f = Math.pow(10, n); return Math.round(x * f) / f; },
+    gcd: (...nums) => nums.map(Math.abs).reduce((a, b) => { while (b) { [a, b] = [b, a % b]; } return a; }),
+    factorial: (n) => { if (n < 0 || Math.floor(n) !== n) throw new CalcError('factorial requires a non-negative integer'); let r = 1; for (let i = 2; i <= n; i++) r *= i; return r; },
+    min: Math.min, max: Math.max,
+  };
+
+  function tokenize(s){
+    const tokens = [];
+    let i = 0;
+    while (i < s.length) {
+      const c = s[i];
+      if (/\s/.test(c)) { i++; continue; }
+      if (/[0-9.]/.test(c)) {
+        let j = i, seenDot = false, seenExp = false;
+        while (j < s.length) {
+          const ch = s[j];
+          if (/[0-9]/.test(ch)) { j++; continue; }
+          if (ch === '.' && !seenDot && !seenExp) { seenDot = true; j++; continue; }
+          if ((ch === 'e' || ch === 'E') && !seenExp && j > i) { seenExp = true; j++; if (s[j] === '+' || s[j] === '-') j++; continue; }
+          break;
+        }
+        tokens.push({ type: 'NUM', value: parseFloat(s.slice(i, j)) });
+        i = j; continue;
+      }
+      if (/[A-Za-z_]/.test(c)) {
+        let j = i;
+        while (j < s.length && /[A-Za-z0-9_]/.test(s[j])) j++;
+        tokens.push({ type: 'IDENT', value: s.slice(i, j) });
+        i = j; continue;
+      }
+      if (s.slice(i, i + 2) === '**') { tokens.push({ type: 'OP', value: '**' }); i += 2; continue; }
+      if (s.slice(i, i + 2) === '//') { tokens.push({ type: 'OP', value: '//' }); i += 2; continue; }
+      if ('+-*/%(),='.includes(c)) { tokens.push({ type: 'OP', value: c }); i++; continue; }
+      throw new CalcError(`Unexpected character '${c}'`);
+    }
+    return tokens;
+  }
+
+  class Parser {
+    constructor(tokens, vars){ this.toks = tokens; this.pos = 0; this.vars = vars; }
+    peek(){ return this.toks[this.pos]; }
+    next(){ return this.toks[this.pos++]; }
+    expectOp(v){ const t = this.next(); if (!t || t.type !== 'OP' || t.value !== v) throw new CalcError(`Expected '${v}'`); return t; }
+    parseExpr(){
+      let left = this.parseTerm();
+      while (this.peek() && this.peek().type === 'OP' && (this.peek().value === '+' || this.peek().value === '-')) {
+        const op = this.next().value; const right = this.parseTerm();
+        left = op === '+' ? left + right : left - right;
+      }
+      return left;
+    }
+    parseTerm(){
+      let left = this.parseUnary();
+      while (this.peek() && this.peek().type === 'OP' && ['*', '/', '//', '%'].includes(this.peek().value)) {
+        const op = this.next().value; const right = this.parseUnary();
+        if (op === '*') left = left * right;
+        else if (op === '/') { if (right === 0) throw new CalcError('division by zero'); left = left / right; }
+        else if (op === '//') left = pyFloorDiv(left, right);
+        else left = pyMod(left, right);
+      }
+      return left;
+    }
+    parseUnary(){
+      if (this.peek() && this.peek().type === 'OP' && (this.peek().value === '+' || this.peek().value === '-')) {
+        const op = this.next().value; const val = this.parseUnary();
+        return op === '-' ? -val : val;
+      }
+      return this.parsePower();
+    }
+    parsePower(){
+      const base = this.parsePrimary();
+      if (this.peek() && this.peek().type === 'OP' && this.peek().value === '**') {
+        this.next(); const exp = this.parseUnary(); return Math.pow(base, exp);
+      }
+      return base;
+    }
+    parsePrimary(){
+      const t = this.peek();
+      if (!t) throw new CalcError('Unexpected end of expression');
+      if (t.type === 'NUM') { this.next(); return t.value; }
+      if (t.type === 'IDENT') {
+        this.next(); const name = t.value;
+        if (this.peek() && this.peek().type === 'OP' && this.peek().value === '(') {
+          this.next();
+          const args = [];
+          if (!(this.peek() && this.peek().type === 'OP' && this.peek().value === ')')) {
+            args.push(this.parseExpr());
+            while (this.peek() && this.peek().type === 'OP' && this.peek().value === ',') { this.next(); args.push(this.parseExpr()); }
+          }
+          this.expectOp(')');
+          if (!(name in FUNCS)) throw new CalcError(`Unknown function: ${name}`);
+          return FUNCS[name](...args);
+        }
+        if (Object.prototype.hasOwnProperty.call(this.vars, name)) return this.vars[name];
+        if (name in CONSTANTS) return CONSTANTS[name];
+        if (name in FUNCS) throw new CalcError(`'${name}' is a function — try ${name}(x)`);
+        throw new CalcError(`Unknown variable: ${name}`);
+      }
+      if (t.type === 'OP' && t.value === '(') { this.next(); const v = this.parseExpr(); this.expectOp(')'); return v; }
+      throw new CalcError(`Unexpected token '${t.value}'`);
+    }
+  }
+
+  function evaluate(text, vars){
+    const tokens = tokenize(text);
+    if (tokens.length === 0) throw new CalcError('Empty expression');
+    if (tokens.length >= 3 && tokens[0].type === 'IDENT' && tokens[1].type === 'OP' && tokens[1].value === '=') {
+      const name = tokens[0].value;
+      if (name in CONSTANTS) throw new CalcError(`Cannot reassign constant '${name}'`);
+      const parser = new Parser(tokens.slice(2), vars);
+      const value = parser.parseExpr();
+      if (parser.pos !== parser.toks.length) throw new CalcError('Cannot evaluate expression');
+      vars[name] = value;
+      return { assigned: name, value };
+    }
+    const parser = new Parser(tokens, vars);
+    const value = parser.parseExpr();
+    if (parser.pos !== parser.toks.length) throw new CalcError('Cannot evaluate expression');
+    return { assigned: null, value };
+  }
+
+  function formatNumber(n){
+    if (Number.isNaN(n)) return 'NaN';
+    if (n === Infinity) return '∞';
+    if (n === -Infinity) return '-∞';
+    if (Number.isInteger(n) && Math.abs(n) < 1e15) return n.toString();
+    if (Math.abs(n) !== 0 && (Math.abs(n) < 1e-9 || Math.abs(n) > 1e15)) return n.toExponential(6).replace(/e\+?/, 'e');
+    let s = n.toPrecision(12);
+    if (s.includes('.')) s = s.replace(/0+$/, '').replace(/\.$/, '');
+    return s;
+  }
+
+  /* ============ App state ============ */
+  let vars = {};
+  let tape = [];           // {expr, result, assigned, error}
+  let inputHist = [];      // raw typed strings, for Up/Down recall
+  let histPos = -1;
+
+  const exprInput = document.getElementById('exprInput');
+  const preview = document.getElementById('preview');
+  const tapeScroll = document.getElementById('tapeScroll');
+  const tapeEmpty = document.getElementById('tapeEmpty');
+  const tapeCount = document.getElementById('tapeCount');
+  const varsRow = document.getElementById('varsRow');
+  const varHint = document.getElementById('varHint');
+  const status = document.getElementById('status');
+  const tapePanel = document.getElementById('tapePanel');
+  const tapeToggle = document.getElementById('tapeToggle');
+
+  function setStatus(msg, kind){
+    status.textContent = msg;
+    status.classList.remove('is-error', 'is-ok');
+    if (kind) status.classList.add(kind);
+  }
+
+  function renderVars(){
+    varsRow.innerHTML = '';
+    const keys = Object.keys(vars);
+    if (keys.length === 0) {
+      varsRow.appendChild(varHint);
+      return;
+    }
+    keys.forEach((k) => {
+      const chip = document.createElement('span');
+      chip.className = 'var-chip';
+      chip.innerHTML = `<b>${k}</b>${formatNumber(vars[k])}`;
+      chip.title = `Insert ${k}`;
+      chip.addEventListener('click', (e) => { if (e.target.tagName !== 'BUTTON') insertAtCursor(k); });
+      const del = document.createElement('button');
+      del.textContent = '×';
+      del.title = `Remove ${k}`;
+      del.addEventListener('click', (e) => { e.stopPropagation(); delete vars[k]; renderVars(); setStatus(`Removed '${k}'`); });
+      chip.appendChild(del);
+      varsRow.appendChild(chip);
+    });
+  }
+
+  function renderTape(){
+    tapeCount.textContent = tape.length;
+    if (tape.length === 0) { tapeScroll.innerHTML = ''; tapeScroll.appendChild(tapeEmpty); return; }
+    tapeScroll.innerHTML = '';
+    tape.forEach((entry, i) => {
+      const row = document.createElement('div');
+      row.className = 'tape-entry' + (entry.error ? ' is-error' : '') + (entry.assigned ? ' is-assign' : '');
+      const exprText = entry.assigned ? `${entry.assigned} = ${entry.exprRHS}` : entry.expr;
+      row.innerHTML = `
+        <div class="tape-row">
+          <span class="tape-idx">${i + 1}</span>
+          <span class="tape-expr">${exprText}</span>
+          <span class="tape-result">${entry.error ? entry.error : formatNumber(entry.result)}</span>
+        </div>`;
+      if (!entry.error) {
+        row.addEventListener('click', () => insertAtCursor(formatNumber(entry.result)));
+        row.title = 'Click to insert this result';
+      }
+      tapeScroll.appendChild(row);
+    });
+    tapeScroll.scrollTop = tapeScroll.scrollHeight;
+  }
+
+  function insertAtCursor(text){
+    const el = exprInput;
+    const start = el.selectionStart ?? el.value.length;
+    const end = el.selectionEnd ?? el.value.length;
+    el.value = el.value.slice(0, start) + text + el.value.slice(end);
+    const pos = start + text.length;
+    el.focus();
+    el.setSelectionRange(pos, pos);
+    updatePreview();
+  }
+
+  function insertFunc(name){
+    insertAtCursor(name + '(');
+  }
+
+  function updatePreview(){
+    const text = exprInput.value.trim();
+    if (!text) { preview.innerHTML = '&nbsp;'; preview.classList.remove('is-error'); return; }
+    try {
+      const tempVars = { ...vars };
+      const res = evaluate(text, tempVars);
+      preview.classList.remove('is-error');
+      if (res.assigned) {
+        preview.innerHTML = `<span class="assign-name">${res.assigned}</span><span class="eq"> will be </span><span class="val">${formatNumber(res.value)}</span>`;
+      } else {
+        preview.innerHTML = `<span class="eq">=</span><span class="val">${formatNumber(res.value)}</span>`;
+      }
+    } catch (e) {
+      preview.innerHTML = '&nbsp;';
+      preview.classList.remove('is-error');
+    }
+  }
+
+  function commit(){
+    const text = exprInput.value.trim();
+    if (!text) return;
+    try {
+      const res = evaluate(text, vars);
+      if (res.assigned) {
+        const rhs = text.slice(text.indexOf('=') + 1).trim();
+        tape.push({ assigned: res.assigned, exprRHS: rhs, result: res.value, error: null });
+        setStatus(`Stored ${res.assigned} = ${formatNumber(res.value)}`, 'is-ok');
+      } else {
+        tape.push({ expr: text, result: res.value, error: null });
+        setStatus('Ready', null);
+      }
+      inputHist.push(text);
+      histPos = inputHist.length;
+      exprInput.value = '';
+      renderVars();
+      renderTape();
+      updatePreview();
+    } catch (e) {
+      tape.push({ expr: text, result: null, error: e.message || 'Error' });
+      renderTape();
+      setStatus(e.message || 'Error', 'is-error');
+    }
+  }
+
+  exprInput.addEventListener('input', updatePreview);
+  exprInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); commit(); }
+    else if (e.key === 'Escape') { exprInput.value = ''; updatePreview(); }
+    else if (e.key === 'ArrowUp') {
+      if (inputHist.length === 0) return;
+      e.preventDefault();
+      histPos = Math.max(0, histPos - 1);
+      exprInput.value = inputHist[histPos] ?? '';
+      updatePreview();
+    } else if (e.key === 'ArrowDown') {
+      if (inputHist.length === 0) return;
+      e.preventDefault();
+      histPos = Math.min(inputHist.length, histPos + 1);
+      exprInput.value = inputHist[histPos] ?? '';
+      updatePreview();
+    }
+  });
+
+  document.getElementById('clearVarsBtn').addEventListener('click', () => {
+    vars = {}; renderVars(); setStatus('Variables cleared', 'is-ok');
+  });
+
+  /* ---------- function row ---------- */
+  const FUNC_KEYS = [
+    { label: 'sin', insert: 'func', name: 'sin' },
+    { label: 'cos', insert: 'func', name: 'cos' },
+    { label: 'tan', insert: 'func', name: 'tan' },
+    { label: '√', insert: 'func', name: 'sqrt' },
+    { label: 'log', insert: 'func', name: 'log' },
+    { label: 'ln', insert: 'func', name: 'log' },
+    { label: 'x^y', insert: 'text', text: '**' },
+    { label: 'π', insert: 'text', text: 'pi' },
+    { label: 'e', insert: 'text', text: 'e' },
+    { label: '//', insert: 'text', text: ' // ' },
+    { label: 'x=', insert: 'text', text: 'x = ', isVar: true },
+    { label: 'y=', insert: 'text', text: 'y = ', isVar: true },
+  ];
+  const funcRow = document.getElementById('funcRow');
+  FUNC_KEYS.forEach((f) => {
+    const btn = document.createElement('button');
+    btn.className = 'fkey' + (f.isVar ? ' var-insert' : '');
+    btn.textContent = f.label;
+    btn.addEventListener('click', () => {
+      if (f.insert === 'func') insertFunc(f.name);
+      else insertAtCursor(f.text);
+    });
+    funcRow.appendChild(btn);
+  });
+
+  /* ---------- keypad ---------- */
+  const KEYS = [
+    { label: 'AC', cls: 'util danger', action: () => { exprInput.value = ''; updatePreview(); exprInput.focus(); } },
+    { label: 'DEL', cls: 'util', action: () => {
+        const el = exprInput; const pos = el.selectionStart ?? el.value.length;
+        if (pos > 0) { el.value = el.value.slice(0, pos - 1) + el.value.slice(pos); el.setSelectionRange(pos - 1, pos - 1); }
+        updatePreview(); el.focus();
+      } },
+    { label: '(', cls: 'op', action: () => insertAtCursor('(') },
+    { label: ')', cls: 'op', action: () => insertAtCursor(')') },
+
+    { label: '7', action: () => insertAtCursor('7') },
+    { label: '8', action: () => insertAtCursor('8') },
+    { label: '9', action: () => insertAtCursor('9') },
+    { label: '÷', cls: 'op', action: () => insertAtCursor(' / ') },
+
+    { label: '4', action: () => insertAtCursor('4') },
+    { label: '5', action: () => insertAtCursor('5') },
+    { label: '6', action: () => insertAtCursor('6') },
+    { label: '×', cls: 'op', action: () => insertAtCursor(' * ') },
+
+    { label: '1', action: () => insertAtCursor('1') },
+    { label: '2', action: () => insertAtCursor('2') },
+    { label: '3', action: () => insertAtCursor('3') },
+    { label: '−', cls: 'op', action: () => insertAtCursor(' - ') },
+
+    { label: '0', action: () => insertAtCursor('0') },
+    { label: '.', action: () => insertAtCursor('.') },
+    { label: '=', cls: 'equals', action: () => commit() },
+    { label: '+', cls: 'op', action: () => insertAtCursor(' + ') },
+  ];
+  const keypad = document.getElementById('keypad');
+  KEYS.forEach((k) => {
+    const btn = document.createElement('button');
+    btn.className = 'key' + (k.cls ? ' ' + k.cls : '');
+    btn.textContent = k.label;
+    btn.addEventListener('click', k.action);
+    keypad.appendChild(btn);
+  });
+
+  /* ---------- mobile tape drawer ---------- */
+  tapeToggle.addEventListener('click', () => {
+    const open = tapePanel.classList.toggle('open');
+    tapeToggle.setAttribute('aria-expanded', open);
+  });
+  document.querySelector('.tape-head').addEventListener('click', (e) => {
+    if (window.innerWidth <= 760 && e.target === e.currentTarget) {
+      tapePanel.classList.remove('open');
+    }
+  });
+
+  /* ---------- help modal ---------- */
+  const helpModal = document.getElementById('helpModal');
+  document.getElementById('helpBtn').addEventListener('click', () => { helpModal.hidden = false; });
+  document.getElementById('helpClose').addEventListener('click', () => { helpModal.hidden = true; });
+  helpModal.addEventListener('click', (e) => { if (e.target === helpModal) helpModal.hidden = true; });
+
+  /* ---------- init ---------- */
+  renderVars();
+  renderTape();
+  exprInput.focus();
+})();
+</script>
+</body>
+</html>
